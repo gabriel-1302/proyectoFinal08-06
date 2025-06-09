@@ -32,8 +32,9 @@ class _MapScreenState extends State<MapScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   Timer? _infraccionesTimer;
 
-  final String restrictionsApiUrl = 'http://192.168.1.9:8000/api/zonas-restringidas/';
-  final String infraccionesApiUrl = 'http://192.168.1.9:8080/api/infracciones/';
+  final String restrictionsApiUrl = 'http://192.168.1.6:8000/api/zonas-restringidas/';
+  final String infraccionesApiUrl = 'http://192.168.1.6:8080/api/infracciones/';
+  final String vehiclesApiUrl = 'http://192.168.1.6:8080/api/vehicles/';
   String _displayMode = 'both';
 
   @override
@@ -42,8 +43,8 @@ class _MapScreenState extends State<MapScreen> {
     _loadRestrictions();
     _loadRestrictedZone();
     _getCurrentLocation();
-    if (widget.role == 'policia') {
-      _fetchInfracciones();
+    _fetchInfracciones(); // Llamar para ambos roles
+    if (widget.role == 'policia' || widget.role == 'ciudadano') {
       _infraccionesTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
         _fetchInfracciones();
       });
@@ -57,12 +58,54 @@ class _MapScreenState extends State<MapScreen> {
     super.dispose();
   }
 
-  Future<void> _fetchInfracciones() async {
-    if (widget.role != 'policia') return;
-
+  Future<List<String>> _getPlacasCiudadano() async {
+    if (widget.role != 'ciudadano') return [];
     try {
       final response = await http.get(
-        Uri.parse('$infraccionesApiUrl?pagado=false'),
+        Uri.parse(vehiclesApiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((vehicle) => vehicle['placa'].toString()).toList();
+      } else {
+        setState(() {
+          _errorMessage = 'Error al obtener vehículos: ${response.statusCode}';
+        });
+        return [];
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error al obtener vehículos: $e';
+      });
+      return [];
+    }
+  }
+
+  Future<void> _fetchInfracciones() async {
+    try {
+      String url = infraccionesApiUrl;
+      if (widget.role == 'ciudadano') {
+        final placas = await _getPlacasCiudadano();
+        if (placas.isEmpty) {
+          setState(() {
+            _markers.removeWhere((marker) => marker.markerId.value.startsWith('infraccion_'));
+          });
+          return;
+        }
+        url += '?pagado=false&placa=${placas.join(',')}'; // Filtra por placas del ciudadano
+      } else if (widget.role == 'policia') {
+        url += '?pagado=false'; // Todas las infracciones no pagadas para policía
+      } else {
+        return; // Otros roles no obtienen infracciones
+      }
+
+      final response = await http.get(
+        Uri.parse(url),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}',

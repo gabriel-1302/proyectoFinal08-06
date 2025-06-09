@@ -127,34 +127,57 @@ from .serializers import InfraccionSerializer
 from django.utils import timezone
 from django.db.models import Q
 from datetime import datetime
+from django.db.models import Q
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from .models import Infraccion, Vehicle
+from .serializers import InfraccionSerializer
+from datetime import datetime
+
 class InfraccionListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if request.user.profile.role != 'policia':
-            return Response({'message': 'Acceso denegado'}, status=status.HTTP_403_FORBIDDEN)
-        
-        infracciones = Infraccion.objects.all()
-        
-        # Filtro por fecha
-        fecha = request.query_params.get('fecha', None)
-        if fecha:
-            try:
-                fecha_dt = datetime.strptime(fecha, '%Y-%m-%d').date()
-                infracciones = infracciones.filter(fecha_hora__date=fecha_dt)
-            except ValueError:
-                return Response({'message': 'Formato de fecha inválido (use YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Filtro por pagado
-        pagado = request.query_params.get('pagado', None)
-        if pagado is not None:
-            pagado_bool = pagado.lower() == 'true'
-            infracciones = infracciones.filter(pagado=pagado_bool)
-        
-        # Filtro por placa
-        placa = request.query_params.get('placa', None)
-        if placa:
-            infracciones = infracciones.filter(placa__icontains=placa)
+        if request.user.profile.role == 'ciudadano':
+            # Obtener las placas de los vehículos del usuario
+            user_vehicles = Vehicle.objects.filter(user_profile=request.user.profile)
+            user_plates = user_vehicles.values_list('placa', flat=True)
+            # Filtrar infracciones por las placas del usuario y pagado=False
+            infracciones = Infraccion.objects.filter(placa__in=user_plates, pagado=False)
+            
+            # Permitir filtro opcional por fecha
+            fecha = request.query_params.get('fecha', None)
+            if fecha:
+                try:
+                    fecha_dt = datetime.strptime(fecha, '%Y-%m-%d').date()
+                    infracciones = infracciones.filter(fecha_hora__date=fecha_dt)
+                except ValueError:
+                    return Response({'message': 'Formato de fecha inválido (use YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
+        else:  # Para policías
+            infracciones = Infraccion.objects.all()
+            
+            # Filtro por fecha
+            fecha = request.query_params.get('fecha', None)
+            if fecha:
+                try:
+                    fecha_dt = datetime.strptime(fecha, '%Y-%m-%d').date()
+                    infracciones = infracciones.filter(fecha_hora__date=fecha_dt)
+                except ValueError:
+                    return Response({'message': 'Formato de fecha inválido (use YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Filtro por pagado
+            pagado = request.query_params.get('pagado', None)
+            if pagado is not None:
+                pagado_bool = pagado.lower() == 'true'
+                infracciones = infracciones.filter(pagado=pagado_bool)
+            
+            # Filtro por placa
+            placa = request.query_params.get('placa', None)
+            if placa:
+                placas_list = placa.split(',')
+                infracciones = infracciones.filter(placa__in=placas_list)
         
         serializer = InfraccionSerializer(infracciones, many=True)
         return Response(serializer.data)
@@ -167,7 +190,6 @@ class InfraccionListCreateView(APIView):
             serializer.save(usuario=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
     def patch(self, request):
         if request.user.profile.role != 'policia':
             return Response({'message': 'Acceso denegado'}, status=status.HTTP_403_FORBIDDEN)
