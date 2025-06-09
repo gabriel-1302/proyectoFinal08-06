@@ -24,6 +24,7 @@ class _SecondAppScreenState extends State<SecondAppScreen> {
   int lastProcessedId = 0;
   Timer? _timer;
   List<ApiMessage> mensajes = [];
+  bool isLoading = false;
 
   @override
   void initState() {
@@ -65,6 +66,12 @@ class _SecondAppScreenState extends State<SecondAppScreen> {
   }
 
   Future<void> fetchMessages() async {
+    if (isLoading) return;
+    
+    setState(() {
+      isLoading = true;
+    });
+
     try {
       print('Fetching messages from: $apiUrl');
       final response = await http.get(Uri.parse(apiUrl));
@@ -89,32 +96,25 @@ class _SecondAppScreenState extends State<SecondAppScreen> {
         }
       } else {
         print('Error al cargar datos: ${response.statusCode}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al cargar datos: ${response.statusCode}'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (e) {
       print('Excepción al cargar datos: $e');
-    }
-  }
-
-  Future<void> enviarMensajePrueba() async {
-    final mensaje = {
-      'mensaje': 'Mensaje de prueba ${DateTime.now()}',
-    };
-    
-    try {
-      final response = await http.post(
-        Uri.parse(apiUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(mensaje),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error de conexión'),
+          backgroundColor: Colors.red,
+        ),
       );
-      
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        print('Mensaje enviado correctamente');
-        fetchMessages();
-      } else {
-        print('Error al enviar mensaje: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Excepción al enviar mensaje: $e');
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
@@ -149,65 +149,87 @@ class _SecondAppScreenState extends State<SecondAppScreen> {
     );
   }
 
-  Future<void> mostrarNotificacionManual() async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'canal_manual',
-      'Notificaciones Manuales',
-      channelDescription: 'Canal para las notificaciones manuales',
-      importance: Importance.max,
-      priority: Priority.high,
-      showWhen: true,
-    );
-
-    const NotificationDetails notificationDetails = NotificationDetails(
-      android: androidDetails,
-      iOS: DarwinNotificationDetails(),
-    );
-
-    setState(() {
-      _notificationId++;
-    });
-    
-    await flutterLocalNotificationsPlugin.show(
-      _notificationId,
-      'Notificación Manual #$_notificationId',
-      'Esta es una notificación manual creada desde la app',
-      notificationDetails,
-    );
-  }
-
   void showImageModal(BuildContext context, String? imageUrl) {
     final String displayUrl = imageUrl ?? 'https://via.placeholder.com/640x480';
     print('Opening modal with image: $displayUrl');
     showDialog(
       context: context,
+      barrierDismissible: true,
       builder: (BuildContext context) {
         return Dialog(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Image.network(
-                  displayUrl,
-                  fit: BoxFit.contain,
-                  height: MediaQuery.of(context).size.height * 0.7,
-                  width: MediaQuery.of(context).size.width * 0.9,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return const Center(child: CircularProgressIndicator());
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    print('Error loading modal image: $error, StackTrace: $stackTrace');
-                    return const Text('Error al cargar la imagen');
-                  },
+          backgroundColor: Colors.transparent,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12.0),
+                  decoration: const BoxDecoration(
+                    color: Colors.blue,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      topRight: Radius.circular(12),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Imagen de la infracción',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        constraints: const BoxConstraints(),
+                        padding: EdgeInsets.zero,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cerrar'),
-              ),
-            ],
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      displayUrl,
+                      fit: BoxFit.contain,
+                      height: MediaQuery.of(context).size.height * 0.6,
+                      width: MediaQuery.of(context).size.width * 0.8,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        print('Error loading modal image: $error, StackTrace: $stackTrace');
+                        return Container(
+                          height: 200,
+                          alignment: Alignment.center,
+                          child: const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                              SizedBox(height: 8),
+                              Text('Error al cargar la imagen'),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -217,110 +239,287 @@ class _SecondAppScreenState extends State<SecondAppScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: const Text('Notificaciones desde API'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            const Text(
-              'Notificaciones de la API',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: enviarMensajePrueba,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              ),
-              child: const Text(
-                'Enviar mensaje de prueba a la API',
-                style: TextStyle(fontSize: 16),
-              ),
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: mostrarNotificacionManual,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              ),
-              child: const Text(
-                'Crear notificación manual',
-                style: TextStyle(fontSize: 16),
-              ),
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: fetchMessages,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              ),
-              child: const Text(
-                'Verificar API ahora',
-                style: TextStyle(fontSize: 16),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Total de notificaciones: $_notificationId',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Mensajes recibidos:',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: mensajes.isEmpty
-                  ? const Center(child: Text('No hay mensajes recibidos todavía'))
-                  : ListView.builder(
-                      itemCount: mensajes.length,
-                      itemBuilder: (context, index) {
-                        final reversedIndex = mensajes.length - 1 - index;
-                        final mensaje = mensajes[reversedIndex];
-                        return Card(
-                          margin: const EdgeInsets.symmetric(vertical: 4),
-                          child: ListTile(
-                            leading: GestureDetector(
-                              onTap: () => showImageModal(context, mensaje.image),
-                              child: mensaje.image != null
-                                  ? Image.network(
-                                      mensaje.image!,
-                                      width: 80,
-                                      height: 80,
-                                      fit: BoxFit.cover,
-                                      cacheWidth: 160,
-                                      cacheHeight: 160,
-                                      loadingBuilder: (context, child, loadingProgress) {
-                                        if (loadingProgress == null) return child;
-                                        return const CircularProgressIndicator();
-                                      },
-                                      errorBuilder: (context, error, stackTrace) {
-                                        print('Error loading thumbnail: $error, StackTrace: $stackTrace');
-                                        return const Icon(Icons.broken_image, size: 80);
-                                      },
-                                    )
-                                  : const Icon(Icons.image_not_supported, size: 80),
-                            ),
-                            title: Text('ID: ${mensaje.id}'),
-                            subtitle: Text(mensaje.mensaje),
-                            trailing: Text(
-                              '${mensaje.timestamp.hour}:${mensaje.timestamp.minute.toString().padLeft(2, '0')}',
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+        title: const Text(
+          'Monitor de Infracciones',
+          style: TextStyle(fontWeight: FontWeight.w600),
         ),
+        elevation: 0,
+        actions: [
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.notifications, size: 16),
+                const SizedBox(width: 4),
+                Text(
+                  '$_notificationId',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Header con botón de refresh
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: const BoxDecoration(
+              color: Colors.blue,
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(24),
+                bottomRight: Radius.circular(24),
+              ),
+            ),
+            child: Column(
+              children: [
+                ElevatedButton.icon(
+                  onPressed: isLoading ? null : fetchMessages,
+                  icon: isLoading 
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                        ),
+                      )
+                    : const Icon(Icons.refresh),
+                  label: Text(isLoading ? 'Verificando...' : 'Verificar API'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.blue,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    elevation: 2,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Última actualización: ${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Contenido principal
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Infracciones Recientes',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '${mensajes.length} total',
+                          style: TextStyle(
+                            color: Colors.blue[700],
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  Expanded(
+                    child: mensajes.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.inbox_outlined,
+                                  size: 64,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No hay infracciones registradas',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Los nuevas infracciones aparecerán aquí',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[500],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: mensajes.length,
+                            separatorBuilder: (context, index) => const SizedBox(height: 8),
+                            itemBuilder: (context, index) {
+                              final reversedIndex = mensajes.length - 1 - index;
+                              final mensaje = mensajes[reversedIndex];
+                              return Card(
+                                elevation: 2,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(12),
+                                  onTap: mensaje.image != null 
+                                    ? () => showImageModal(context, mensaje.image)
+                                    : null,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Row(
+                                      children: [
+                                        // Imagen/Icono
+                                        Container(
+                                          width: 60,
+                                          height: 60,
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(8),
+                                            color: Colors.grey[200],
+                                          ),
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(8),
+                                            child: mensaje.image != null
+                                                ? Image.network(
+                                                    mensaje.image!,
+                                                    fit: BoxFit.cover,
+                                                    cacheWidth: 120,
+                                                    cacheHeight: 120,
+                                                    loadingBuilder: (context, child, loadingProgress) {
+                                                      if (loadingProgress == null) return child;
+                                                      return const Center(
+                                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                                      );
+                                                    },
+                                                    errorBuilder: (context, error, stackTrace) {
+                                                      return const Icon(
+                                                        Icons.broken_image,
+                                                        color: Colors.grey,
+                                                        size: 30,
+                                                      );
+                                                    },
+                                                  )
+                                                : const Icon(
+                                                    Icons.image_not_supported,
+                                                    color: Colors.grey,
+                                                    size: 30,
+                                                  ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        
+                                        // Contenido
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 2,
+                                                    ),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.red.withOpacity(0.1),
+                                                      borderRadius: BorderRadius.circular(12),
+                                                    ),
+                                                    child: Text(
+                                                      'ID: ${mensaje.id}',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: Colors.red[700],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    '${mensaje.timestamp.hour}:${mensaje.timestamp.minute.toString().padLeft(2, '0')}',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey[600],
+                                                      fontWeight: FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Text(
+                                                mensaje.mensaje,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.black87,
+                                                ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        
+                                        // Indicador de imagen
+                                        if (mensaje.image != null)
+                                          Container(
+                                            margin: const EdgeInsets.only(left: 8),
+                                            child: Icon(
+                                              Icons.touch_app,
+                                              color: Colors.blue[600],
+                                              size: 20,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
