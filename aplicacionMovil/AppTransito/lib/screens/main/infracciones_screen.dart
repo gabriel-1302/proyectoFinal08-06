@@ -39,7 +39,7 @@ class _InfraccionesScreenState extends State<InfraccionesScreen> {
     });
 
     try {
-      var url = Uri.parse('http://192.168.43.11:8080/api/infracciones/');
+      var url = Uri.parse('http://192.168.1.3:8080/api/infracciones/');
       if (fecha != null || pagado != null || placa != null) {
         final queryParams = <String, String>{};
         if (fecha != null) queryParams['fecha'] = fecha;
@@ -83,11 +83,11 @@ class _InfraccionesScreenState extends State<InfraccionesScreen> {
       };
       
       print('Enviando PATCH request:');
-      print('URL: http://192.168.43.11:8080/api/infracciones/');
+      print('URL: http://192.168.1.3:8080/api/infracciones/');
       print('Body: ${json.encode(requestBody)}');
       
       final response = await http.patch(
-        Uri.parse('http://192.168.43.11:8080/api/infracciones/'),
+        Uri.parse('http://192.168.1.3:8080/api/infracciones/'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}',

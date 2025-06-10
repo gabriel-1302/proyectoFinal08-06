@@ -33,10 +33,10 @@ class _MapScreenState extends State<MapScreen> {
   Timer? _infraccionesTimer;
   Timer? _parqueosTimer;
 
-  final String restrictionsApiUrl = 'http://192.168.43.11:8000/api/zonas-restringidas/';
-  final String infraccionesApiUrl = 'http://192.168.43.11:8080/api/infracciones/';
-  final String vehiclesApiUrl = 'http://192.168.43.11:8080/api/vehicles/';
-  final String parqueosApiUrl = 'http://192.168.43.11:8001/api/parqueos/'; // Updated port to 8001
+  final String restrictionsApiUrl = 'http://192.168.1.3:8000/api/zonas-restringidas/';
+  final String infraccionesApiUrl = 'http://192.168.1.3:8080/api/infracciones/';
+  final String vehiclesApiUrl = 'http://192.168.1.3:8080/api/vehicles/';
+  final String parqueosApiUrl = 'http://192.168.1.3:8001/api/parqueos/'; // Updated port to 8001
   String _displayMode = 'both';
 
   @override
@@ -201,7 +201,7 @@ class _MapScreenState extends State<MapScreen> {
                     icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
                     infoWindow: InfoWindow(
                       title: parqueo['descripcion'],
-                      snippet: 'Espacio disponible: ${parqueo['espacio_disponible']} metros',
+                      snippet: '${parqueo['espacio_disponible']} metros disponibles.',
                     ),
                   ),
                 );
