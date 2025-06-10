@@ -31,10 +31,12 @@ class _MapScreenState extends State<MapScreen> {
   final TextEditingController _placaController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   Timer? _infraccionesTimer;
+  Timer? _parqueosTimer;
 
-  final String restrictionsApiUrl = 'http://192.168.1.6:8000/api/zonas-restringidas/';
-  final String infraccionesApiUrl = 'http://192.168.1.6:8080/api/infracciones/';
-  final String vehiclesApiUrl = 'http://192.168.1.6:8080/api/vehicles/';
+  final String restrictionsApiUrl = 'http://192.168.43.11:8000/api/zonas-restringidas/';
+  final String infraccionesApiUrl = 'http://192.168.43.11:8080/api/infracciones/';
+  final String vehiclesApiUrl = 'http://192.168.43.11:8080/api/vehicles/';
+  final String parqueosApiUrl = 'http://192.168.43.11:8001/api/parqueos/'; // Updated port to 8001
   String _displayMode = 'both';
 
   @override
@@ -42,19 +44,25 @@ class _MapScreenState extends State<MapScreen> {
     super.initState();
     _loadRestrictions();
     _loadRestrictedZone();
+    _loadParqueos();
     _getCurrentLocation();
-    _fetchInfracciones(); // Llamar para ambos roles
+    _fetchInfracciones();
     if (widget.role == 'policia' || widget.role == 'ciudadano') {
       _infraccionesTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
         _fetchInfracciones();
       });
     }
+    _parqueosTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      print('Ejecutando _loadParqueos cada 5 segundos');
+      _loadParqueos();
+  });
   }
 
   @override
   void dispose() {
     _placaController.dispose();
     _infraccionesTimer?.cancel();
+    _parqueosTimer?.cancel();
     super.dispose();
   }
 
@@ -97,11 +105,11 @@ class _MapScreenState extends State<MapScreen> {
           });
           return;
         }
-        url += '?pagado=false&placa=${placas.join(',')}'; // Filtra por placas del ciudadano
+        url += '?pagado=false&placa=${placas.join(',')}';
       } else if (widget.role == 'policia') {
-        url += '?pagado=false'; // Todas las infracciones no pagadas para policía
+        url += '?pagado=false';
       } else {
-        return; // Otros roles no obtienen infracciones
+        return;
       }
 
       final response = await http.get(
@@ -143,6 +151,85 @@ class _MapScreenState extends State<MapScreen> {
       });
     }
   }
+
+  Future<void> _loadParqueos() async {
+  try {
+    print('Realizando solicitud GET a parqueosApiUrl: $parqueosApiUrl');
+    final response = await http.get(Uri.parse(parqueosApiUrl));
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(utf8.decode(response.bodyBytes));
+      if (data.isEmpty) {
+        setState(() {
+          _errorMessage = 'No se encontraron parqueos.';
+        });
+        return;
+      }
+
+      setState(() {
+        _polylines.removeWhere((polyline) => polyline.polylineId.value.startsWith('parqueo_'));
+        _markers.removeWhere((marker) => marker.markerId.value.startsWith('parqueo_'));
+        for (var parqueo in data) {
+          if (parqueo['latitud_uno'] != null &&
+              parqueo['longitud_uno'] != null &&
+              parqueo['latitud_dos'] != null &&
+              parqueo['longitud_dos'] != null) {
+            if (parqueo['longitud_uno'].abs() <= 180 && parqueo['longitud_dos'].abs() <= 180 &&
+                parqueo['latitud_uno'].abs() <= 90 && parqueo['latitud_dos'].abs() <= 90) {
+              // Agregar polilínea (azul si espacio_disponible >= 4, negro si es < 4)
+              _polylines.add(
+                Polyline(
+                  polylineId: PolylineId('parqueo_${parqueo['id']}'),
+                  points: [
+                    LatLng(parqueo['latitud_uno'], parqueo['longitud_uno']),
+                    LatLng(parqueo['latitud_dos'], parqueo['longitud_dos']),
+                  ],
+                  color: parqueo['espacio_disponible'] >= 4 ? Colors.blue : const Color.fromARGB(255, 255, 0, 0),
+                  width: 6,
+                ),
+              );
+              print('Polilínea agregada para parqueo ${parqueo['id']}');
+
+              // Solo agregar marcador si espacio_disponible >= 4
+              if (parqueo['espacio_disponible'] >= 4) {
+                final midLat = (parqueo['latitud_uno'] + parqueo['latitud_dos']) / 2;
+                final midLon = (parqueo['longitud_uno'] + parqueo['longitud_dos']) / 2;
+                _markers.add(
+                  Marker(
+                    markerId: MarkerId('parqueo_mid_${parqueo['id']}'),
+                    position: LatLng(midLat, midLon),
+                    icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+                    infoWindow: InfoWindow(
+                      title: parqueo['descripcion'],
+                      snippet: 'Espacio disponible: ${parqueo['espacio_disponible']} metros',
+                    ),
+                  ),
+                );
+                print('Marcador agregado para parqueo ${parqueo['id']}');
+              }
+            } else {
+              print('Coordenadas inválidas para parqueo ${parqueo['id']}');
+            }
+          } else {
+            print('Faltan coordenadas para parqueo ${parqueo['id']}');
+          }
+        }
+        _errorMessage = _polylines.isEmpty ? 'No se pudieron cargar parqueos válidos.' : null;
+        print('Total polilíneas: ${_polylines.length}, Total marcadores: ${_markers.length}');
+      });
+    } else {
+      setState(() {
+        _errorMessage = 'Error al cargar parqueos: ${response.statusCode}';
+      });
+      print('Error en solicitud GET: ${response.statusCode}');
+    }
+  } catch (e) {
+    setState(() {
+      _errorMessage = 'Error de conexión: $e';
+    });
+    print('Error al cargar parqueos: $e');
+  }
+}
 
   Future<void> _getCurrentLocation() async {
     try {
@@ -203,7 +290,7 @@ class _MapScreenState extends State<MapScreen> {
         }
 
         setState(() {
-          _polylines.clear();
+          _polylines.removeWhere((polyline) => polyline.polylineId.value.startsWith('restriction_'));
           for (var item in data) {
             if (item['coordenada1_lat'] != null &&
                 item['coordenada1_lon'] != null &&

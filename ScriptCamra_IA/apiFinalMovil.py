@@ -69,7 +69,7 @@ fotos_dir = 'fotos'
 os.makedirs(fotos_dir, exist_ok=True)
 
 # Configuración de la API
-API_URL = 'http://192.168.1.6:8001/api/infractions/'
+API_URL = 'http://192.168.43.11:8001/api/infractions/'
 
 # Variables para el contador y temporizador
 stable_count = None  # Valor estable del contador

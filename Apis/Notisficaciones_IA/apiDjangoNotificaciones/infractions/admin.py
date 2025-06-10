@@ -1,9 +1,6 @@
 from django.contrib import admin
-
-# Register your models here.
-from django.contrib import admin
 from django.utils.html import format_html
-from .models import Infraction
+from .models import Infraction, Parqueo
 
 @admin.register(Infraction)
 class InfractionAdmin(admin.ModelAdmin):
@@ -27,5 +24,16 @@ class InfractionAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {
             'fields': ('mensaje', 'image', 'timestamp', 'image_preview')
+        }),
+    )
+
+@admin.register(Parqueo)
+class ParqueoAdmin(admin.ModelAdmin):
+    list_display = ('descripcion', 'espacio_disponible', 'latitud_uno', 'longitud_uno', 'latitud_dos', 'longitud_dos')
+    list_filter = ('espacio_disponible',)
+    search_fields = ('descripcion',)
+    fieldsets = (
+        (None, {
+            'fields': ('descripcion', 'latitud_uno', 'longitud_uno', 'latitud_dos', 'longitud_dos', 'espacio_disponible')
         }),
     )

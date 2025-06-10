@@ -53,7 +53,7 @@ class _VehiclesScreenState extends State<VehiclesScreen>
   Future<void> fetchVehicles() async {
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.1.6:8080/api/vehicles/'),
+        Uri.parse('http://192.168.43.11:8080/api/vehicles/'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}',
@@ -96,9 +96,9 @@ class _VehiclesScreenState extends State<VehiclesScreen>
       final url =
           isEditing
               ? Uri.parse(
-                'http://192.168.1.6:8080/api/vehicles/$editingVehicleId/',
+                'http://192.168.43.11:8080/api/vehicles/$editingVehicleId/',
               )
-              : Uri.parse('http://192.168.1.6:8080/api/vehicles/');
+              : Uri.parse('http://192.168.43.11:8080/api/vehicles/');
       final method = isEditing ? http.put : http.post;
 
       final response = await method(
@@ -175,7 +175,7 @@ class _VehiclesScreenState extends State<VehiclesScreen>
   Future<void> deleteVehicle(int id) async {
     try {
       final response = await http.delete(
-        Uri.parse('http://192.168.1.6:8080/api/vehicles/$id/'),
+        Uri.parse('http://192.168.43.11:8080/api/vehicles/$id/'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}',

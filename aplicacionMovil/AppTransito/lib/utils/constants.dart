@@ -1,10 +1,10 @@
 class ApiConstants {
   // Zonas restringidas
-  static const String zonasBaseUrl         = 'http://192.168.1.6:8000/api';
+  static const String zonasBaseUrl         = 'http://192.168.43.11:8000/api';
   static const String zonasRestrigidasUrl  = '$zonasBaseUrl/zonas-restringidas/';
 
   // Autenticación (login) en otro servidor o ruta
-  static const String authBaseUrl          = 'http://192.168.1.6:8080/api';  
+  static const String authBaseUrl          = 'http://192.168.43.11:8080/api';  
   static const String loginUrl             = '$authBaseUrl/login/';
 
   // (Opcional) otros endpoints de auth

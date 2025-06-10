@@ -17,9 +17,9 @@ class SecondAppScreen extends StatefulWidget {
 class _SecondAppScreenState extends State<SecondAppScreen> {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
-  
+
   int _notificationId = 0;
-  final String apiBaseUrl = 'http://192.168.1.6:8001';
+  final String apiBaseUrl = 'http://192.168.43.11:8001';
   String get apiUrl => '$apiBaseUrl/api/infractions/';
   int lastProcessedId = 0;
   Timer? _timer;
@@ -32,7 +32,7 @@ class _SecondAppScreenState extends State<SecondAppScreen> {
     init();
     startApiPolling();
   }
-  
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -43,17 +43,21 @@ class _SecondAppScreenState extends State<SecondAppScreen> {
     tz.initializeTimeZones();
     tz.setLocalLocation(tz.getLocation('America/La_Paz'));
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const DarwinInitializationSettings iosSettings = DarwinInitializationSettings();
-    const InitializationSettings initializationSettings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
     );
+    const DarwinInitializationSettings iosSettings =
+        DarwinInitializationSettings();
+    const InitializationSettings initializationSettings =
+        InitializationSettings(android: androidSettings, iOS: iosSettings);
     await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
     if (Platform.isAndroid) {
-      final androidPlugin = flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
+      final androidPlugin =
+          flutterLocalNotificationsPlugin
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
       await androidPlugin?.requestNotificationsPermission();
     }
   }
@@ -67,7 +71,7 @@ class _SecondAppScreenState extends State<SecondAppScreen> {
 
   Future<void> fetchMessages() async {
     if (isLoading) return;
-    
+
     setState(() {
       isLoading = true;
     });
@@ -75,17 +79,18 @@ class _SecondAppScreenState extends State<SecondAppScreen> {
     try {
       print('Fetching messages from: $apiUrl');
       final response = await http.get(Uri.parse(apiUrl));
-      
+
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         print('API response: $data');
-        
-        final List<ApiMessage> newMessages = data
-            .map((item) => ApiMessage.fromJson(item, apiBaseUrl))
-            .toList();
-        
+
+        final List<ApiMessage> newMessages =
+            data.map((item) => ApiMessage.fromJson(item, apiBaseUrl)).toList();
+
         for (var message in newMessages) {
-          print('Processing message ID: ${message.id}, Image: ${message.image}');
+          print(
+            'Processing message ID: ${message.id}, Image: ${message.image}',
+          );
           if (message.id > lastProcessedId) {
             lastProcessedId = message.id;
             mostrarNotificacionDesdeApi(message);
@@ -119,15 +124,16 @@ class _SecondAppScreenState extends State<SecondAppScreen> {
   }
 
   Future<void> mostrarNotificacionDesdeApi(ApiMessage message) async {
-    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'api_canal',
-      'Notificaciones de API',
-      channelDescription: 'Canal para las notificaciones desde la API',
-      importance: Importance.max,
-      priority: Priority.high,
-      showWhen: true,
-      when: message.timestamp.millisecondsSinceEpoch,
-    );
+    final AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          'api_canal',
+          'Notificaciones de API',
+          channelDescription: 'Canal para las notificaciones desde la API',
+          importance: Importance.max,
+          priority: Priority.high,
+          showWhen: true,
+          when: message.timestamp.millisecondsSinceEpoch,
+        );
 
     final NotificationDetails notificationDetails = NotificationDetails(
       android: androidDetails,
@@ -137,10 +143,10 @@ class _SecondAppScreenState extends State<SecondAppScreen> {
     setState(() {
       _notificationId++;
     });
-    
-    final String formattedTime = 
+
+    final String formattedTime =
         '${message.timestamp.hour}:${message.timestamp.minute.toString().padLeft(2, '0')}';
-    
+
     await flutterLocalNotificationsPlugin.show(
       _notificationId,
       'Notificación #${message.id}',
@@ -206,19 +212,23 @@ class _SecondAppScreenState extends State<SecondAppScreen> {
                       width: MediaQuery.of(context).size.width * 0.8,
                       loadingBuilder: (context, child, loadingProgress) {
                         if (loadingProgress == null) return child;
-                        return const Center(
-                          child: CircularProgressIndicator(),
-                        );
+                        return const Center(child: CircularProgressIndicator());
                       },
                       errorBuilder: (context, error, stackTrace) {
-                        print('Error loading modal image: $error, StackTrace: $stackTrace');
+                        print(
+                          'Error loading modal image: $error, StackTrace: $stackTrace',
+                        );
                         return Container(
                           height: 200,
                           alignment: Alignment.center,
                           child: const Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                              Icon(
+                                Icons.broken_image,
+                                size: 64,
+                                color: Colors.grey,
+                              ),
                               SizedBox(height: 8),
                               Text('Error al cargar la imagen'),
                             ],
@@ -287,21 +297,27 @@ class _SecondAppScreenState extends State<SecondAppScreen> {
               children: [
                 ElevatedButton.icon(
                   onPressed: isLoading ? null : fetchMessages,
-                  icon: isLoading 
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-                        ),
-                      )
-                    : const Icon(Icons.refresh),
+                  icon:
+                      isLoading
+                          ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.blue,
+                              ),
+                            ),
+                          )
+                          : const Icon(Icons.refresh),
                   label: Text(isLoading ? 'Verificando...' : 'Verificar API'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.blue,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(25),
                     ),
@@ -319,7 +335,7 @@ class _SecondAppScreenState extends State<SecondAppScreen> {
               ],
             ),
           ),
-          
+
           // Contenido principal
           Expanded(
             child: Padding(
@@ -339,7 +355,10 @@ class _SecondAppScreenState extends State<SecondAppScreen> {
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.blue.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(20),
@@ -356,164 +375,203 @@ class _SecondAppScreenState extends State<SecondAppScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  
+
                   Expanded(
-                    child: mensajes.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.inbox_outlined,
-                                  size: 64,
-                                  color: Colors.grey[400],
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'No hay infracciones registradas',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.grey[600],
-                                    fontWeight: FontWeight.w500,
+                    child:
+                        mensajes.isEmpty
+                            ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.inbox_outlined,
+                                    size: 64,
+                                    color: Colors.grey[400],
                                   ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Los nuevas infracciones aparecerán aquí',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[500],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        : ListView.separated(
-                            itemCount: mensajes.length,
-                            separatorBuilder: (context, index) => const SizedBox(height: 8),
-                            itemBuilder: (context, index) {
-                              final reversedIndex = mensajes.length - 1 - index;
-                              final mensaje = mensajes[reversedIndex];
-                              return Card(
-                                elevation: 2,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(12),
-                                  onTap: mensaje.image != null 
-                                    ? () => showImageModal(context, mensaje.image)
-                                    : null,
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(12),
-                                    child: Row(
-                                      children: [
-                                        // Imagen/Icono
-                                        Container(
-                                          width: 60,
-                                          height: 60,
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(8),
-                                            color: Colors.grey[200],
-                                          ),
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(8),
-                                            child: mensaje.image != null
-                                                ? Image.network(
-                                                    mensaje.image!,
-                                                    fit: BoxFit.cover,
-                                                    cacheWidth: 120,
-                                                    cacheHeight: 120,
-                                                    loadingBuilder: (context, child, loadingProgress) {
-                                                      if (loadingProgress == null) return child;
-                                                      return const Center(
-                                                        child: CircularProgressIndicator(strokeWidth: 2),
-                                                      );
-                                                    },
-                                                    errorBuilder: (context, error, stackTrace) {
-                                                      return const Icon(
-                                                        Icons.broken_image,
-                                                        color: Colors.grey,
-                                                        size: 30,
-                                                      );
-                                                    },
-                                                  )
-                                                : const Icon(
-                                                    Icons.image_not_supported,
-                                                    color: Colors.grey,
-                                                    size: 30,
-                                                  ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        
-                                        // Contenido
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
-                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                children: [
-                                                  Container(
-                                                    padding: const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 2,
-                                                    ),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.red.withOpacity(0.1),
-                                                      borderRadius: BorderRadius.circular(12),
-                                                    ),
-                                                    child: Text(
-                                                      'ID: ${mensaje.id}',
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        fontWeight: FontWeight.bold,
-                                                        color: Colors.red[700],
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    '${mensaje.timestamp.hour}:${mensaje.timestamp.minute.toString().padLeft(2, '0')}',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: Colors.grey[600],
-                                                      fontWeight: FontWeight.w500,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 6),
-                                              Text(
-                                                mensaje.mensaje,
-                                                style: const TextStyle(
-                                                  fontSize: 14,
-                                                  color: Colors.black87,
-                                                ),
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        
-                                        // Indicador de imagen
-                                        if (mensaje.image != null)
-                                          Container(
-                                            margin: const EdgeInsets.only(left: 8),
-                                            child: Icon(
-                                              Icons.touch_app,
-                                              color: Colors.blue[600],
-                                              size: 20,
-                                            ),
-                                          ),
-                                      ],
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No hay infracciones registradas',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.w500,
                                     ),
                                   ),
-                                ),
-                              );
-                            },
-                          ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Los nuevas infracciones aparecerán aquí',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[500],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                            : ListView.separated(
+                              itemCount: mensajes.length,
+                              separatorBuilder:
+                                  (context, index) => const SizedBox(height: 8),
+                              itemBuilder: (context, index) {
+                                final reversedIndex =
+                                    mensajes.length - 1 - index;
+                                final mensaje = mensajes[reversedIndex];
+                                return Card(
+                                  elevation: 2,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(12),
+                                    onTap:
+                                        mensaje.image != null
+                                            ? () => showImageModal(
+                                              context,
+                                              mensaje.image,
+                                            )
+                                            : null,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12),
+                                      child: Row(
+                                        children: [
+                                          // Imagen/Icono
+                                          Container(
+                                            width: 60,
+                                            height: 60,
+                                            decoration: BoxDecoration(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              color: Colors.grey[200],
+                                            ),
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              child:
+                                                  mensaje.image != null
+                                                      ? Image.network(
+                                                        mensaje.image!,
+                                                        fit: BoxFit.cover,
+                                                        cacheWidth: 120,
+                                                        cacheHeight: 120,
+                                                        loadingBuilder: (
+                                                          context,
+                                                          child,
+                                                          loadingProgress,
+                                                        ) {
+                                                          if (loadingProgress ==
+                                                              null)
+                                                            return child;
+                                                          return const Center(
+                                                            child:
+                                                                CircularProgressIndicator(
+                                                                  strokeWidth:
+                                                                      2,
+                                                                ),
+                                                          );
+                                                        },
+                                                        errorBuilder: (
+                                                          context,
+                                                          error,
+                                                          stackTrace,
+                                                        ) {
+                                                          return const Icon(
+                                                            Icons.broken_image,
+                                                            color: Colors.grey,
+                                                            size: 30,
+                                                          );
+                                                        },
+                                                      )
+                                                      : const Icon(
+                                                        Icons
+                                                            .image_not_supported,
+                                                        color: Colors.grey,
+                                                        size: 30,
+                                                      ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+
+                                          // Contenido
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceBetween,
+                                                  children: [
+                                                    Container(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 8,
+                                                            vertical: 2,
+                                                          ),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.red
+                                                            .withOpacity(0.1),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              12,
+                                                            ),
+                                                      ),
+                                                      child: Text(
+                                                        'ID: ${mensaje.id}',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          color:
+                                                              Colors.red[700],
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      '${mensaje.timestamp.hour}:${mensaje.timestamp.minute.toString().padLeft(2, '0')}',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: Colors.grey[600],
+                                                        fontWeight:
+                                                            FontWeight.w500,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 6),
+                                                Text(
+                                                  mensaje.mensaje,
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    color: Colors.black87,
+                                                  ),
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+
+                                          // Indicador de imagen
+                                          if (mensaje.image != null)
+                                            Container(
+                                              margin: const EdgeInsets.only(
+                                                left: 8,
+                                              ),
+                                              child: Icon(
+                                                Icons.touch_app,
+                                                color: Colors.blue[600],
+                                                size: 20,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                   ),
                 ],
               ),
@@ -530,14 +588,14 @@ class ApiMessage {
   final String mensaje;
   final DateTime timestamp;
   final String? image;
-  
+
   ApiMessage({
     required this.id,
     required this.mensaje,
     required this.timestamp,
     this.image,
   });
-  
+
   factory ApiMessage.fromJson(Map<String, dynamic> json, String apiBaseUrl) {
     String? imageUrl;
     if (json['image'] != null) {
@@ -551,7 +609,7 @@ class ApiMessage {
     } else {
       print('No image in JSON: $json');
     }
-    
+
     return ApiMessage(
       id: json['id'],
       mensaje: json['mensaje'],
