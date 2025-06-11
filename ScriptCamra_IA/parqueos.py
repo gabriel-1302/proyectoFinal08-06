@@ -3,6 +3,8 @@ import numpy as np
 from ultralytics import YOLO
 import os
 import math
+import time
+import requests
 
 # Configuración del modelo - MODIFICA ESTA RUTA CON LA UBICACIÓN DE TU MODELO
 MODEL_PATH = "models/yolov8n.pt"  # Ajusta según tu configuración
@@ -31,6 +33,8 @@ class CarSpaceDetector:
         self.vehicle_classes = [2]  # Solo autos (clase 2 en COCO)
         self.class_names = {2: 'car'}
         self.pixels_per_meter = None  # Se calculará con la línea definida por el usuario
+        self.last_espacio_disponible = 0  # Último valor de espacio disponible
+        self.last_espacios = 0  # Último valor de espacios válidos
     
     def set_pixels_per_meter(self, point1, point2):
         """Calcula la relación píxeles por metro basada en la línea de 20 metros."""
@@ -156,6 +160,8 @@ class CarSpaceDetector:
         if not line_defined:
             cv2.putText(frame_copy, "Haz clic en 2 puntos para definir la linea de 20m", 
                         (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            self.last_espacio_disponible = 0
+            self.last_espacios = 0
             return frame_copy, 0, 0
         
         # Calcular píxeles por metro si no está definido
@@ -181,24 +187,28 @@ class CarSpaceDetector:
             espacio_disponible = int(round(available_space))
             espacios = 4
             info_text = [
-            f"Autos detectados: {len(cars)}",
-            f"Espacio ocupado: {occupied_space:.2f}m",
-            f"Espacio disponible: {espacio_disponible}m",
-            f"Espacios validos: {espacios}",
-            f"Longitud total: {self.street_length_meters}m",
-            f"Pixeles por metro: {self.pixels_per_meter:.2f}"
+                f"Autos detectados: {len(cars)}",
+                f"Espacio ocupado: {occupied_space:.2f}m",
+                f"Espacio disponible: {espacio_disponible}m",
+                f"Espacios validos: {espacios}",
+                f"Longitud total: {self.street_length_meters}m",
+                f"Pixeles por metro: {self.pixels_per_meter:.2f}"
             ]
         else:
             espacio_disponible = int(round(available_space))
             espacios = len(available_segments)
             info_text = [
-            f"Autos detectados: {len(cars)}",
-            f"Espacio ocupado: {occupied_space:.2f}m",
-            f"Espacio disponible: {espacio_disponible}m",
-            f"Espacios validos: {espacios}",
-            f"Longitud total: {self.street_length_meters}m",
-            f"Pixeles por metro: {self.pixels_per_meter:.2f}"
+                f"Autos detectados: {len(cars)}",
+                f"Espacio ocupado: {occupied_space:.2f}m",
+                f"Espacio disponible: {espacio_disponible}m",
+                f"Espacios validos: {espacios}",
+                f"Longitud total: {self.street_length_meters}m",
+                f"Pixeles por metro: {self.pixels_per_meter:.2f}"
             ]
+        
+        # Actualizar las variables de instancia
+        self.last_espacio_disponible = espacio_disponible
+        self.last_espacios = espacios
         
         y_offset = 20
         for i, text in enumerate(info_text):
@@ -268,6 +278,7 @@ def process_video(detector, cap):
     
     print("Presiona 'q' para salir, 'r' para reiniciar la selección de puntos")
     frame_count = 0
+    last_update_time = time.time()  # Tiempo de la última actualización
     
     while True:
         ret, frame = cap.read()
@@ -286,6 +297,23 @@ def process_video(detector, cap):
             
             if frame_count % 20 == 0 and line_defined:
                 print(f"Frame {frame_count} | Autos: {car_count} | Espacio disponible: {available_space:.2f}m")
+            
+            # Verificar si han pasado 5 segundos y la línea está definida
+            current_time = time.time()
+            if line_defined and current_time - last_update_time >= 5:
+                payload = {
+                    "descripcion": f"Espacios disponibles: {detector.last_espacios}",
+                    "espacio_disponible": detector.last_espacio_disponible
+                }
+                try:
+                    response = requests.patch("http://192.168.1.3:8001/api/parqueos/2/", json=payload)
+                    if response.status_code == 200:
+                        print("API actualizada exitosamente")
+                    else:
+                        print(f"Fallo al actualizar la API: {response.status_code}")
+                except Exception as e:
+                    print(f"Error al actualizar la API: {e}")
+                last_update_time = current_time
         
         except Exception as e:
             print(f"Error procesando frame {frame_count}: {e}")
@@ -313,6 +341,19 @@ def process_image(detector, image):
         cv2.imshow("Resultado - Detector de Autos", processed_image)
         
         if line_defined:
+            payload = {
+                "descripcion": f"Espacios disponibles: {detector.last_espacios}",
+                "espacio_disponible": detector.last_espacio_disponible
+            }
+            try:
+                response = requests.patch("http://192.168.1.3:8001/api/parqueos/2/", json=payload)
+                if response.status_code == 200:
+                    print("API actualizada exitosamente")
+                else:
+                    print(f"Fallo al actualizar la API: {response.status_code}")
+            except Exception as e:
+                print(f"Error al actualizar la API: {e}")
+            
             print(f"Análisis completado:")
             print(f"Autos detectados: {car_count}")
             print(f"Espacio disponible: {available_space:.2f} metros")
